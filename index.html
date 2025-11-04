@@ -1,0 +1,36 @@
+<!--
+ * WebGL 美颜滤镜 Demo 页面
+ * 
+ * 功能：
+ * - 提供网页结构，包含视频元素和画布元素
+ * - 引入必要的第三方库：MediaPipe Face Mesh 和 Camera Utils
+ * - 加载样式文件和主程序模块
+ * 
+ * 作者：WebGL 技术团队
+ * 日期：2023
+ -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WebGL 美颜滤镜 Demo</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <video id="video" autoplay playsinline style="display:none;"></video>
+  <canvas id="canvas"></canvas>
+  
+  <div id="info" style="position: fixed; bottom: 20px; left: 20px; background-color: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 5px; font-family: Arial, sans-serif; max-width: 300px;">
+    <h3 style="margin-top: 0;">WebGL 美颜滤镜</h3>
+    <p style="margin-bottom: 5px;">点击右上角按钮选择本地视频文件，系统将自动应用美颜效果。</p>
+    <p style="margin: 5px 0; font-size: 12px;">功能：磨皮、亮度调整、饱和度增强、人脸局部美颜</p>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
