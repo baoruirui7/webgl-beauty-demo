@@ -250,13 +250,36 @@ async function main() {
       if (faceDetectionEnabled) {
         // 人脸识别开启状态：使用人脸关键点控制美颜范围
         if (faceLandmarks) {
+          // 根据人脸关键点动态计算美颜范围，不再使用固定半径
           // 取鼻尖关键点作为脸部中心（索引1对应鼻尖）
-          // 注意：纹理坐标系的Y轴是向下的，而人脸检测坐标系的Y轴是向上的，所以需要翻转
           const noseTip = faceLandmarks[1];
-          // 传递脸部中心坐标给片元着色器
-          gl.uniform2f(u_faceCenter, noseTip.x, 1.0 - noseTip.y);
-          // 传递美颜处理半径（0.25是归一化纹理坐标中的半径）
-          gl.uniform1f(u_faceRadius, 0.25);
+
+          // 使用多个关键点来动态计算人脸大小
+          // 利用额头顶部(10)、下巴(152)、左眼外角(234)和右眼外角(454)计算人脸尺寸
+          const forehead = faceLandmarks[10]; // 额头顶部
+          const chin = faceLandmarks[152]; // 下巴位置
+          const leftEyeCorner = faceLandmarks[234]; // 左眼外角
+          const rightEyeCorner = faceLandmarks[454]; // 右眼外角
+
+          // 计算人脸垂直方向长度（额头到下巴）
+          const faceHeight = Math.abs(forehead.y - chin.y);
+          // 计算人脸水平方向长度（左眼外角到右眼外角）
+          const faceWidth = Math.abs(rightEyeCorner.x - leftEyeCorner.x);
+
+          // 取最大尺寸作为基础，再乘以一个适当系数（1.2）确保完整覆盖面部
+          // 归一化纹理坐标中，1.0代表整个画布宽度
+          const faceSize = Math.max(faceHeight, faceWidth) * 1.2;
+
+          gl.uniform2f(u_faceCenter, noseTip.x, noseTip.y);
+
+          // 使用动态计算的半径，而不是固定值0.25
+          gl.uniform1f(u_faceRadius, faceSize / 2);
+
+          console.log(
+            `动态计算的人脸大小: ${faceSize.toFixed(3)}, 半径: ${(
+              faceSize / 2
+            ).toFixed(3)}`
+          );
         } else {
           // 如果没检测到人脸，关闭局部处理（半径为0）
           gl.uniform1f(u_faceRadius, 0.0);
@@ -339,11 +362,11 @@ function setupVideoSelection() {
   function loadLocalVideo(file) {
     // 创建视频URL
     const videoURL = URL.createObjectURL(file);
-    
+
     // 停止当前视频播放
     video.pause();
     video.src = videoURL;
-    
+
     // 确保设置为自动重播
     video.loop = true;
     // 视频加载完成后自动播放
