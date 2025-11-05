@@ -172,8 +172,9 @@ async function main() {
   const u_texture = gl.getUniformLocation(program, "u_texture");
   // 人脸中心点坐标
   const u_faceCenter = gl.getUniformLocation(program, "u_faceCenter");
-  // 人脸处理半径
-  const u_faceRadius = gl.getUniformLocation(program, "u_faceRadius");
+  // 人脸处理椭圆半径（长轴和短轴）
+  const u_faceRadiusMajor = gl.getUniformLocation(program, "u_faceRadiusMajor");
+  const u_faceRadiusMinor = gl.getUniformLocation(program, "u_faceRadiusMinor");
   // 磨皮强度参数
   const u_smoothness = gl.getUniformLocation(program, "u_smoothness");
   // 亮度提升参数
@@ -238,6 +239,8 @@ async function main() {
       // 渲染步骤2：传入画布分辨率，用于纹理采样偏移计算
       gl.uniform2f(u_resolution, canvas.width, canvas.height);
 
+      // 移除宽高比校正，因为现在使用椭圆来适应人脸形状
+
       // 3. 定期进行人脸检测
       if (timestamp - lastDetectionTime > detectionInterval) {
         faceMesh.send({ image: video }).catch((err) => {
@@ -250,7 +253,7 @@ async function main() {
       if (faceDetectionEnabled) {
         // 人脸识别开启状态：使用人脸关键点控制美颜范围
         if (faceLandmarks) {
-          // 根据人脸关键点动态计算美颜范围，不再使用固定半径
+          // 根据人脸关键点动态计算美颜范围，使用椭圆来匹配人脸形状
           // 取鼻尖关键点作为脸部中心（索引1对应鼻尖）
           const noseTip = faceLandmarks[1];
 
@@ -266,28 +269,38 @@ async function main() {
           // 计算人脸水平方向长度（左眼外角到右眼外角）
           const faceWidth = Math.abs(rightEyeCorner.x - leftEyeCorner.x);
 
-          // 取最大尺寸作为基础，再乘以一个适当系数（1.2）确保完整覆盖面部
-          // 归一化纹理坐标中，1.0代表整个画布宽度
-          const faceSize = Math.max(faceHeight, faceWidth) * 1.2;
+          // 计算人脸自然长宽比，不受视频比例影响
+          // 先计算人脸的比例系数
+          const faceRatio = faceWidth / faceHeight;
 
-          gl.uniform2f(u_faceCenter, noseTip.x, noseTip.y);
+          // 以人脸高度作为基准（通常更稳定），根据实际比例计算椭圆参数
+          // 这样椭圆形状只由人脸本身决定，不受视频比例影响
+          const baseSize = faceHeight * 1.2; // 以高度为基准，确保完整覆盖
+          const majorAxis = baseSize * Math.max(faceRatio);
+          const minorAxis = baseSize;
 
-          // 使用动态计算的半径，而不是固定值0.25
-          gl.uniform1f(u_faceRadius, faceSize / 2);
+          // 设置人脸中心点
+          gl.uniform2f(u_faceCenter, noseTip.x, noseTip.y - 0.05);
+
+          // 设置椭圆的长轴和短轴半径
+          gl.uniform1f(u_faceRadiusMajor, majorAxis / 2);
+          gl.uniform1f(u_faceRadiusMinor, minorAxis / 2);
 
           console.log(
-            `动态计算的人脸大小: ${faceSize.toFixed(3)}, 半径: ${(
-              faceSize / 2
-            ).toFixed(3)}`
+            `动态计算的椭圆参数 - 长轴半径: ${(majorAxis / 2).toFixed(
+              3
+            )}, 短轴半径: ${(minorAxis / 2).toFixed(3)}`
           );
         } else {
-          // 如果没检测到人脸，关闭局部处理（半径为0）
-          gl.uniform1f(u_faceRadius, 0.0);
+          // 如果没检测到人脸，关闭局部处理（半径设为极小值）
+          gl.uniform1f(u_faceRadiusMajor, 0.0001);
+          gl.uniform1f(u_faceRadiusMinor, 0.0001);
         }
       } else {
         // 人脸识别关闭状态：将美颜应用到整个画布
-        // 设置一个足够大的半径（归一化坐标中1.5可以覆盖整个画布）
-        gl.uniform1f(u_faceRadius, 1.5);
+        // 设置足够大的椭圆参数以覆盖整个画布
+        gl.uniform1f(u_faceRadiusMajor, 1.5);
+        gl.uniform1f(u_faceRadiusMinor, 1.5);
         // 即使不需要中心点，也设置一个默认值避免着色器错误
         gl.uniform2f(u_faceCenter, 0.5, 0.5);
       }
@@ -307,7 +320,6 @@ async function main() {
         gl.uniform1f(u_saturation, 1.0); // 原始饱和度
         gl.uniform1f(u_contrast, 1.0); // 原始对比度
         gl.uniform1f(u_hue, 0.0); // 原始色调
-        gl.uniform1f(u_faceRadius, 0.0); // 关闭局部美颜
       }
 
       // 渲染步骤9：绑定纹理单元并传递给着色器

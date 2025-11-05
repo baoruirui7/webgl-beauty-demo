@@ -53,8 +53,10 @@ export const fragmentShaderSrc = `
   uniform vec2 u_resolution;
   // 人脸中心点 - 从人脸检测结果获得
   uniform vec2 u_faceCenter;
-  // 人脸处理半径 - 控制美颜效果的应用范围
-  uniform float u_faceRadius;
+  // 人脸处理长轴半径 - 控制美颜效果的应用范围
+  uniform float u_faceRadiusMajor;
+  // 人脸处理短轴半径 - 控制美颜效果的应用范围
+  uniform float u_faceRadiusMinor;
   // 磨皮强度参数 - 控制磨皮效果的强度
   uniform float u_smoothness;
   // 亮度提升参数 - 控制亮度增加的程度
@@ -198,14 +200,23 @@ export const fragmentShaderSrc = `
     
     // 计算当前像素到人脸中心的距离
     // 这个距离用于确定是否对该像素应用美颜处理
-    float distToFace = distance(uv, u_faceCenter);
+    // 计算椭圆距离 - 使用标准椭圆方程判断点是否在椭圆内
+    // 椭圆方程: ((x-centerX)/a)^2 + ((y-centerY)/b)^2 <= 1
+    // 其中a是长轴半径，b是短轴半径
+    // 计算到人脸中心的距离，使用预计算的椭圆参数
+    // 由于main.js中已经根据人脸比例计算了合适的椭圆参数，这里直接使用即可
+    // 椭圆参数只与人脸特征相关，不受视频比例影响
+    vec2 diff = uv - u_faceCenter;
+    float ellipseDist = pow(diff.x / u_faceRadiusMajor, 2.0) + pow(diff.y / u_faceRadiusMinor, 2.0);
+    
+    // 当椭圆距离小于1时，点在椭圆内
 
     // 从视频纹理中采样原始颜色
     vec4 color = texture2D(u_texture, uv);
 
     // 关键步骤：只有当像素在人脸区域内时才应用美颜处理
     // 这实现了局部美颜的效果，只处理面部区域
-    if (distToFace < u_faceRadius) {
+    if (ellipseDist < 1.0) {
       // 步骤1：应用双边滤波进行磨皮处理
       vec4 smoothColor = bilateralFilter(uv);
 
