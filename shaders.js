@@ -58,7 +58,7 @@ export const fragmentShaderSrc = `
   // 人脸处理短轴半径 - 控制美颜效果的应用范围
   uniform float u_faceRadiusMinor;
   // 磨皮强度参数 - 控制磨皮效果的强度
-  uniform float u_smoothness;
+  uniform float u_sharpness;
   // 亮度提升参数 - 控制亮度增加的程度
   uniform float u_brightness;
   // 饱和度调整参数 - 控制颜色饱和度的调整比例
@@ -139,58 +139,82 @@ export const fragmentShaderSrc = `
     return 0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
   }
   
-  // 核心美颜算法：改进的双边滤波 - 更好地保留亮度信息
+  // 核心锐化算法 - 实现锐化高清晰、锐化低模糊的效果
   // 参数：
   //   - uv: 纹理坐标
+  //   - sharpness: 锐化强度 (0-1范围，0表示模糊，1表示最大锐化)
   // 返回：
-  //   - vec4: 经过磨皮处理后的颜色值
-  vec4 bilateralFilter(vec2 uv) {
-    // 空间域标准差 - 控制滤波核的空间范围
-    float sigma_d = 4.0;
-    // 亮度域标准差 - 控制亮度相似性的权重
-    float sigma_r = 0.1;
-    // 色彩域标准差 - 控制色彩相似性的权重
-    float sigma_c = 0.15;
-    
+  //   - vec4: 经过锐化或模糊处理的颜色值
+  vec4 sharpenFilter(vec2 uv, float sharpness) {
     // 获取当前像素颜色
     vec4 centerColor = texture2D(u_texture, uv);
-    // 计算当前像素亮度
-    float centerLum = luminance(centerColor.rgb);
     
-    // 用于累积加权平均的变量
-    float sum = 0.0;        // 权重总和
-    vec4 result = vec4(0.0); // 加权颜色总和
-
-    // 5x5的滤波核（从-2到2）
-    for (int x = -2; x <= 2; x++) {
-      for (int y = -2; y <= 2; y++) {
-        // 计算采样偏移量，转换为纹理坐标单位
-        vec2 offset = vec2(float(x), float(y)) / u_resolution;
-        // 获取采样点颜色
-        vec4 sampleColor = texture2D(u_texture, uv + offset);
-        // 计算采样点亮度
-        float sampleLum = luminance(sampleColor.rgb);
-
-        // 计算空间距离权重 - 基于高斯分布
-        float dist = length(offset) / sigma_d;
-        // 计算亮度距离权重 - 基于亮度差异
-        float lumDist = abs(sampleLum - centerLum) / sigma_r;
-        // 计算颜色距离权重 - 基于归一化到亮度的颜色差异
-        // 这样可以在保留亮度信息的同时平滑颜色
-        vec3 colorDiff = (sampleColor.rgb / max(sampleLum, 0.01)) - (centerColor.rgb / max(centerLum, 0.01));
-        float colorDist = length(colorDiff) / sigma_c;
-
-        // 计算总权重 - 空间权重、亮度权重和颜色权重的乘积（指数衰减）
-        float weight = exp(-(dist * dist + lumDist * lumDist + colorDist * colorDist));
-        // 累积加权颜色
-        result += sampleColor * weight;
-        // 累积权重
-        sum += weight;
+    // 根据锐化强度决定是锐化还是模糊
+    // sharpness > 0.5: 锐化效果，sharpness < 0.5: 模糊效果
+    if (sharpness > 0.5) {
+      // 锐化模式：使用拉普拉斯锐化算子
+      // 锐化系数：将0.5-1.0范围映射到0.0-1.0
+      float sharpenFactor = (sharpness - 0.5) * 2.0;
+      
+      // 直接计算锐化效果 - 避免使用数组和变量索引
+      // 手动实现3x3拉普拉斯锐化算子
+      vec4 result = vec4(0.0);
+      
+      // 上一行
+      vec2 offset0 = vec2(-1.0, -1.0) / u_resolution * 2.0;
+      result += texture2D(u_texture, uv + offset0) * 0.0;
+      
+      vec2 offset1 = vec2(0.0, -1.0) / u_resolution * 2.0;
+      result += texture2D(u_texture, uv + offset1) * -1.0;
+      
+      vec2 offset2 = vec2(1.0, -1.0) / u_resolution * 2.0;
+      result += texture2D(u_texture, uv + offset2) * 0.0;
+      
+      // 中间行
+      vec2 offset3 = vec2(-1.0, 0.0) / u_resolution * 2.0;
+      result += texture2D(u_texture, uv + offset3) * -1.0;
+      
+      vec2 offset4 = vec2(0.0, 0.0) / u_resolution * 2.0;
+      result += texture2D(u_texture, uv + offset4) * 5.0; // 中心像素
+      
+      vec2 offset5 = vec2(1.0, 0.0) / u_resolution * 2.0;
+      result += texture2D(u_texture, uv + offset5) * -1.0;
+      
+      // 下一行
+      vec2 offset6 = vec2(-1.0, 1.0) / u_resolution * 2.0;
+      result += texture2D(u_texture, uv + offset6) * 0.0;
+      
+      vec2 offset7 = vec2(0.0, 1.0) / u_resolution * 2.0;
+      result += texture2D(u_texture, uv + offset7) * -1.0;
+      
+      vec2 offset8 = vec2(1.0, 1.0) / u_resolution * 2.0;
+      result += texture2D(u_texture, uv + offset8) * 0.0;
+      
+      // 混合原始图像和锐化结果
+      return mix(centerColor, result, sharpenFactor);
+    } else {
+      // 模糊模式：使用简单的盒式模糊
+      // 模糊系数：将0.0-0.5范围映射到1.0-0.0
+      float blurFactor = 1.0 - (sharpness * 2.0);
+      
+      vec4 result = vec4(0.0);
+      float weightSum = 0.0;
+      
+      // 应用5x5模糊核（更大的范围）
+      for (int x = -2; x <= 2; x++) {
+        for (int y = -2; y <= 2; y++) {
+          // 根据距离计算权重
+          float weight = 1.0 - (length(vec2(float(x), float(y))) / 3.0);
+          vec2 offset = vec2(float(x), float(y)) / u_resolution * 2.0;
+          vec4 sampleColor = texture2D(u_texture, uv + offset);
+          result += sampleColor * weight;
+          weightSum += weight;
+        }
       }
+      
+      // 混合原始图像和模糊结果
+      return mix(centerColor, result / weightSum, blurFactor);
     }
-    
-    // 返回加权平均后的颜色
-    return result / sum;
   }
 
   // 片元着色器主函数 - 每个像素都会执行一次
@@ -217,31 +241,30 @@ export const fragmentShaderSrc = `
     // 关键步骤：只有当像素在人脸区域内时才应用美颜处理
     // 这实现了局部美颜的效果，只处理面部区域
     if (ellipseDist < 1.0) {
-      // 步骤1：应用双边滤波进行磨皮处理
-      vec4 smoothColor = bilateralFilter(uv);
+      // 步骤1：应用锐化或模糊处理
+      vec4 processedColor = sharpenFilter(uv, u_sharpness);
 
       // 步骤2：亮度提升
       // 直接在RGB空间增加每个通道的值
-      smoothColor.rgb += vec3(u_brightness);
+      processedColor.rgb += vec3(u_brightness);
 
       // 步骤3：对比度调整
       // 对比度公式：output = (input - 0.5) * contrast + 0.5
-      smoothColor.rgb = (smoothColor.rgb - 0.5) * u_contrast + 0.5;
-      smoothColor.rgb = clamp(smoothColor.rgb, 0.0, 1.0); // 确保结果在有效范围内
+      processedColor.rgb = (processedColor.rgb - 0.5) * u_contrast + 0.5;
+      processedColor.rgb = clamp(processedColor.rgb, 0.0, 1.0); // 确保结果在有效范围内
       
       // 步骤4：饱和度和色调调整
       // 1. 先转换到HSV颜色空间
-      vec3 hsv = rgb2hsv(smoothColor.rgb);
+      vec3 hsv = rgb2hsv(processedColor.rgb);
       // 2. 调整饱和度分量（乘以系数）
       hsv.y = clamp(hsv.y * u_saturation, 0.0, 1.0); // 确保结果在有效范围内
       // 3. 调整色调分量（增加角度）
       hsv.x = mod(hsv.x + u_hue, 360.0); // 确保色相值在0-360度范围内
       // 4. 转回RGB颜色空间
-      smoothColor.rgb = hsv2rgb(hsv);
+      processedColor.rgb = hsv2rgb(hsv);
 
-      // 步骤4：根据磨皮强度参数混合原始颜色和处理后颜色
-      // u_smoothness=0：不磨皮，u_smoothness=1：完全磨皮
-      color.rgb = mix(color.rgb, smoothColor.rgb, u_smoothness);
+      // 步骤5：使用锐化处理后的颜色直接替换，因为锐化/模糊效果已经内置在processedColor中
+      color = processedColor;
     }
 
     // 输出最终像素颜色

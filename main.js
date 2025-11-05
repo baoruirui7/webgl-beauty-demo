@@ -30,7 +30,7 @@ let beautyEnabled = true;
 let faceDetectionEnabled = true;
 
 // 美颜参数控制变量（全局，初始值为当前默认值）
-let smoothnessVal = 0.6; // 磨皮强度
+let sharpnessVal = 0.5; // 锐化强度 (0-1，0表示模糊，1表示最大锐化)
 let brightnessVal = 0.05; // 亮度提升
 let saturationVal = 1.2; // 饱和度调整
 let contrastVal = 1.0; // 对比度调整（1.0为原始对比度）
@@ -175,8 +175,8 @@ async function main() {
   // 人脸处理椭圆半径（长轴和短轴）
   const u_faceRadiusMajor = gl.getUniformLocation(program, "u_faceRadiusMajor");
   const u_faceRadiusMinor = gl.getUniformLocation(program, "u_faceRadiusMinor");
-  // 磨皮强度参数
-  const u_smoothness = gl.getUniformLocation(program, "u_smoothness");
+  // 锐化强度参数
+  const u_sharpness = gl.getUniformLocation(program, "u_sharpness");
   // 亮度提升参数
   const u_brightness = gl.getUniformLocation(program, "u_brightness");
   // 饱和度调整参数
@@ -308,14 +308,14 @@ async function main() {
       // 渲染步骤8：根据美颜开关状态设置美颜滤镜参数
       if (beautyEnabled) {
         // 开启美颜模式：设置磨皮强度、亮度提升和饱和度增强
-        gl.uniform1f(u_smoothness, smoothnessVal);
+        gl.uniform1f(u_sharpness, sharpnessVal);
         gl.uniform1f(u_brightness, brightnessVal);
         gl.uniform1f(u_saturation, saturationVal);
         gl.uniform1f(u_contrast, contrastVal);
         gl.uniform1f(u_hue, hueVal);
       } else {
         // 关闭美颜模式：使用默认参数
-        gl.uniform1f(u_smoothness, 0.0); // 关闭磨皮
+        gl.uniform1f(u_sharpness, 0.5); // 中性值，既不锐化也不模糊
         gl.uniform1f(u_brightness, 0.0); // 不调整亮度
         gl.uniform1f(u_saturation, 1.0); // 原始饱和度
         gl.uniform1f(u_contrast, 1.0); // 原始对比度
@@ -587,16 +587,16 @@ function setupVideoSelection() {
     return controlDiv;
   }
 
-  // 创建磨皮强度进度条
-  const smoothnessControl = createSliderControl(
-    "磨皮强度",
+  // 创建锐化强度进度条
+  const sharpnessControl = createSliderControl(
+    "锐化强度",
     0.0,
     1.0,
     0.05,
-    smoothnessVal,
+    sharpnessVal,
     (value) => {
-      smoothnessVal = value;
-      console.log("磨皮强度调整为:", value);
+      sharpnessVal = value;
+      console.log("锐化强度调整为:", value);
     }
   );
 
@@ -663,7 +663,7 @@ function setupVideoSelection() {
 
   // 将所有控件添加到容器
   controlsContainer.appendChild(controlsTitle);
-  controlsContainer.appendChild(smoothnessControl);
+  controlsContainer.appendChild(sharpnessControl);
   controlsContainer.appendChild(brightnessControl);
   controlsContainer.appendChild(saturationControl);
   controlsContainer.appendChild(contrastControl);
