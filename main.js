@@ -39,7 +39,7 @@ let hueVal = 0.0; // 色调调整（以角度为单位，0为原始色调）
 // 初始化视频文件
 async function initVideo() {
   try {
-    // 直接加载文件夹中的test.mp4视频文件
+    // 直接加载文件夹中的test.mp4视频文件作为默认视频
     video.src = "test.mp4";
 
     // 设置视频加载完成事件
@@ -53,17 +53,9 @@ async function initVideo() {
         "x",
         video.videoHeight
       );
-      
-      // 不自动播放，等待用户交互后再播放
-      console.log("视频已加载，请点击播放按钮开始播放");
-    };
 
-    // 处理视频加载错误
-    video.onerror = function () {
-      console.error("视频加载失败，请检查test.mp4文件是否存在");
-      // 如果视频加载失败，设置默认画布大小
-      canvas.width = 800;
-      canvas.height = 600;
+      // 不自动播放，等待用户交互后再播放
+      console.log("默认视频已加载，请点击播放按钮开始播放");
     };
   } catch (e) {
     console.error("视频初始化失败:", e);
@@ -315,42 +307,91 @@ async function main() {
   // const processedStream = canvas.captureStream(30);
 }
 
-// 设置视频控制功能（直接使用test.mp4）
+// 设置视频控制功能（支持本地视频选择）
 function setupVideoSelection() {
-  // 添加状态提示按钮（替代文件选择）
-  const statusBtn = document.createElement("button");
-  statusBtn.textContent = "加载中...";
-  statusBtn.style.position = "fixed";
-  statusBtn.style.top = "20px";
-  statusBtn.style.right = "20px";
-  statusBtn.style.zIndex = "1000";
-  statusBtn.style.padding = "10px 15px";
-  statusBtn.style.backgroundColor = "#2196F3";
-  statusBtn.style.color = "white";
-  statusBtn.style.border = "none";
-  statusBtn.style.borderRadius = "5px";
-  statusBtn.style.cursor = "default";
-  statusBtn.style.fontSize = "14px";
-  statusBtn.style.boxShadow = "0 2px 5px rgba(0,0,0,0.2)";
-  statusBtn.disabled = true;
+  // 设置视频自动重播
+  video.loop = true;
+  console.log("视频已设置为自动重播模式");
+  // 添加本地视频选择按钮
+  const selectVideoBtn = document.createElement("button");
+  selectVideoBtn.textContent = "选择本地视频";
+  selectVideoBtn.style.position = "fixed";
+  selectVideoBtn.style.top = "20px";
+  selectVideoBtn.style.right = "20px";
+  selectVideoBtn.style.zIndex = "1000";
+  selectVideoBtn.style.padding = "10px 15px";
+  selectVideoBtn.style.backgroundColor = "#2196F3";
+  selectVideoBtn.style.color = "white";
+  selectVideoBtn.style.border = "none";
+  selectVideoBtn.style.borderRadius = "5px";
+  selectVideoBtn.style.cursor = "pointer";
+  selectVideoBtn.style.fontSize = "14px";
+  selectVideoBtn.style.boxShadow = "0 2px 5px rgba(0,0,0,0.2)";
 
-  // 更新按钮状态的函数
-  function updateStatus(text, color) {
-    statusBtn.textContent = text;
-    statusBtn.style.backgroundColor = color;
+  // 添加隐藏的文件输入元素
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "video/*";
+  fileInput.style.display = "none";
+  document.body.appendChild(fileInput);
+
+  // 加载本地视频文件
+  function loadLocalVideo(file) {
+    // 创建视频URL
+    const videoURL = URL.createObjectURL(file);
+    
+    // 停止当前视频播放
+    video.pause();
+    video.src = videoURL;
+    
+    // 确保设置为自动重播
+    video.loop = true;
+    // 视频加载完成后自动播放
+    video.onloadeddata = function () {
+      // 根据视频尺寸设置画布大小
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      console.log(
+        "视频加载成功，尺寸:",
+        video.videoWidth,
+        "x",
+        video.videoHeight
+      );
+
+      // 尝试播放视频
+      video.play().catch((err) => {
+        console.error("自动播放失败，需要用户交互:", err);
+      });
+    };
+
+    // 处理视频加载错误
+    video.onerror = function () {
+      console.error("视频加载失败");
+      // 释放URL对象
+      URL.revokeObjectURL(videoURL);
+    };
+
+    // 视频结束时释放URL对象
+    video.onended = function () {
+      URL.revokeObjectURL(videoURL);
+    };
   }
 
-  // 监听视频加载事件来更新状态
-  video.addEventListener("loadeddata", () => {
-    updateStatus("已加载test.mp4", "#4CAF50");
-  });
+  // 绑定按钮点击事件，触发文件选择
+  selectVideoBtn.onclick = () => {
+    fileInput.click();
+  };
 
-  video.addEventListener("error", () => {
-    updateStatus("视频加载失败", "#f44336");
+  // 监听文件选择事件
+  fileInput.addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      loadLocalVideo(file);
+    }
   });
 
   // 添加到页面
-  document.body.appendChild(statusBtn);
+  document.body.appendChild(selectVideoBtn);
 
   // 添加视频控制（播放/暂停）
   const playPauseBtn = document.createElement("button");
@@ -372,26 +413,33 @@ function setupVideoSelection() {
   playPauseBtn.onclick = () => {
     if (video.paused) {
       // 用户交互后播放视频
-      video.play().then(() => {
-        playPauseBtn.textContent = "暂停";
-        console.log("视频开始播放");
-      }).catch((err) => {
-        console.error("播放失败:", err);
-      });
+      video
+        .play()
+        .then(() => {
+          playPauseBtn.textContent = "暂停";
+          console.log("视频开始播放");
+        })
+        .catch((err) => {
+          console.error("播放失败:", err);
+        });
     } else {
       video.pause();
       playPauseBtn.textContent = "播放";
       console.log("视频已暂停");
     }
   };
-  
+
   // 添加全局点击事件监听器，确保在任何用户交互后尝试播放
-  document.addEventListener('click', function initPlay() {
-    // 尝试播放视频，但不报错（如果已经播放则忽略）
-    video.play().catch(() => {});
-    // 移除监听器，避免重复尝试
-    document.removeEventListener('click', initPlay);
-  }, { once: true });
+  document.addEventListener(
+    "click",
+    function initPlay() {
+      // 尝试播放视频，但不报错（如果已经播放则忽略）
+      video.play().catch(() => {});
+      // 移除监听器，避免重复尝试
+      document.removeEventListener("click", initPlay);
+    },
+    { once: true }
+  );
 
   document.body.appendChild(playPauseBtn);
 
@@ -440,7 +488,9 @@ function setupVideoSelection() {
 
   faceDetectionToggleBtn.onclick = () => {
     faceDetectionEnabled = !faceDetectionEnabled;
-    faceDetectionToggleBtn.textContent = faceDetectionEnabled ? "关闭人脸识别" : "开启人脸识别";
+    faceDetectionToggleBtn.textContent = faceDetectionEnabled
+      ? "关闭人脸识别"
+      : "开启人脸识别";
     faceDetectionToggleBtn.style.backgroundColor = faceDetectionEnabled
       ? "#4CAF50"
       : "#795548";
@@ -489,9 +539,9 @@ function setupVideoSelection() {
     sliderElement.style.borderRadius = "3px";
     sliderElement.style.background = "#ddd";
     sliderElement.style.outline = "none";
-    
+
     // 事件处理
-    sliderElement.addEventListener("input", function() {
+    sliderElement.addEventListener("input", function () {
       const value = parseFloat(this.value);
       labelElement.textContent = `${label}: ${value.toFixed(2)}`;
       onChange(value);
@@ -583,7 +633,6 @@ function setupVideoSelection() {
   controlsContainer.appendChild(saturationControl);
   controlsContainer.appendChild(contrastControl);
   controlsContainer.appendChild(hueControl);
-
 
   // 添加到页面
   document.body.appendChild(controlsContainer);
