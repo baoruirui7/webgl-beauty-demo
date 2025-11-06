@@ -54,8 +54,9 @@ async function initVideo() {
         video.videoHeight
       );
 
-      // 不自动播放，等待用户交互后再播放
-      console.log("默认视频已加载，请点击播放按钮开始播放");
+      video.play().catch((err) => {
+        console.error("自动播放失败，需要用户交互:", err);
+      });
     };
   } catch (e) {
     console.error("视频初始化失败:", e);
@@ -351,11 +352,11 @@ function setupVideoSelection() {
   const selectVideoBtn = document.createElement("button");
   selectVideoBtn.textContent = "选择本地视频";
   selectVideoBtn.style.position = "fixed";
-  selectVideoBtn.style.top = "20px";
+  selectVideoBtn.style.top = "16px";
   selectVideoBtn.style.right = "20px";
   selectVideoBtn.style.zIndex = "1000";
   selectVideoBtn.style.padding = "10px 15px";
-  selectVideoBtn.style.backgroundColor = "#2196F3";
+  selectVideoBtn.style.backgroundColor = "#e60ef1ff";
   selectVideoBtn.style.color = "white";
   selectVideoBtn.style.border = "none";
   selectVideoBtn.style.borderRadius = "5px";
@@ -451,7 +452,6 @@ function setupVideoSelection() {
       video
         .play()
         .then(() => {
-          playPauseBtn.textContent = "暂停";
           console.log("视频开始播放");
         })
         .catch((err) => {
@@ -459,22 +459,21 @@ function setupVideoSelection() {
         });
     } else {
       video.pause();
-      playPauseBtn.textContent = "播放";
+
       console.log("视频已暂停");
     }
   };
 
-  // 添加全局点击事件监听器，确保在任何用户交互后尝试播放
-  document.addEventListener(
-    "click",
-    function initPlay() {
-      // 尝试播放视频，但不报错（如果已经播放则忽略）
-      video.play().catch(() => {});
-      // 移除监听器，避免重复尝试
-      document.removeEventListener("click", initPlay);
-    },
-    { once: true }
-  );
+  // 添加视频播放状态事件监听器，确保UI与实际状态同步
+  video.addEventListener("play", () => {
+    playPauseBtn.textContent = "暂停";
+    playPauseBtn.style.backgroundColor = "#795548";
+  });
+
+  video.addEventListener("pause", () => {
+    playPauseBtn.textContent = "播放";
+    playPauseBtn.style.backgroundColor = "#2196F3";
+  });
 
   document.body.appendChild(playPauseBtn);
 

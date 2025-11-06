@@ -14,7 +14,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WebGL 美颜滤镜 Demo</title>
+  <title>WebGL 视频图像处理</title>
+  <link rel="icon" type="image/jpeg" href="me.jpeg" />
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -22,13 +23,13 @@
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 </head>
 <body>
-  <video id="video" autoplay playsinline style="display:none;"></video>
+  <video id="video" playsinline style="display:none;"></video>
   <canvas id="canvas"></canvas>
   
   <div id="info" style="position: fixed; bottom: 20px; left: 20px; background-color: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 5px; font-family: Arial, sans-serif; max-width: 300px;">
-    <h3 style="margin-top: 0;">WebGL 美颜滤镜</h3>
-    <p style="margin-bottom: 5px;">点击右上角按钮选择本地视频文件，系统将自动应用美颜效果。</p>
-    <p style="margin: 5px 0; font-size: 12px;">功能：磨皮、亮度调整、饱和度增强、人脸局部美颜</p>
+    <h3 style="margin-top: 0;">webgl视频图像处理</h3>
+    <p style="margin-bottom: 5px;">点击右上角按钮选择本地视频文件，系统将自动应用图像处理效果。</p>
+    <p style="margin: 5px 0; font-size: 12px;">功能：锐化处理、亮度调整、饱和度增强、人脸局部处理</p>
   </div>
 
   <script type="module" src="main.js"></script>
